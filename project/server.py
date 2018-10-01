@@ -1,8 +1,7 @@
 from flask import Flask, jsonify, make_response, request, abort
 from pymongo import MongoClient
 from project import config
-import uuid
-
+import string , random
 app = Flask(__name__)
 
 
@@ -11,19 +10,25 @@ client = MongoClient(config.MONGO_URI)
 mydb = client[config.MONGO_DATABASE_NAME]
 
 
+def slug_generator(size=7, chars=string.ascii_uppercase + string.digits):
+   return ''.join(random.choice(chars) for _ in range(size))
+
 @app.errorhandler(400)
 def bad_request(error):
-    return make_response(jsonify({'message': 'bad request'}), 400)
+    return make_response(jsonify({"status": "failed",
+                                  'message': 'bad request'}), 400)
 
 
 @app.errorhandler(404)
 def not_found(error):
-    return make_response(jsonify({'message': 'Not found'}), 404)
+    return make_response(jsonify({"status": "failed",
+        'message': 'Not found'}), 404)
 
 
 @app.errorhandler(500)
 def not_found(error):
     return make_response(jsonify({}), 500)
+
 
 
 @app.route('/shortlinks', methods=['GET'])
@@ -39,13 +44,18 @@ def get_shortlinks():
     return jsonify('shortlinks', output)
 
 
+
 @app.route('/shortlinks', methods=['POST'])
 def create_shortlinks():
     if not request.json or 'ios' and 'android' and 'web' not in request.json:
         abort(400)
     data = request.json
-    if not data['slug']:
-        slug = str(uuid.uuid4())
+    native = True
+    try:
+        slug = data['slug']
+    except:
+        slug = slug_generator()
+        native = False
     Newrecord = {
 
         "slug": slug,
@@ -53,8 +63,19 @@ def create_shortlinks():
         "android": data['android'],
         "web": data['web']
     }
-    mydb.shortlink.insert(Newrecord)
-    return jsonify({'shortlinks': Newrecord}), 201
+    try:
+        mydb.shortlink.insert(Newrecord)
+    except:
+        abort(400)
+    del Newrecord['_id']
+    if native:
+        return jsonify('shortlinks', Newrecord)
+
+    return jsonify({"status": "successful",
+                    "slug": slug,
+                    "message": "created successfully"}),201
+
+
 
 
 

@@ -2,6 +2,8 @@ from flask import Flask, jsonify, make_response, request, abort
 from pymongo import MongoClient
 from project import config
 import string , random
+import six
+
 app = Flask(__name__)
 
 
@@ -21,8 +23,10 @@ def bad_request(error):
 
 @app.errorhandler(404)
 def not_found(error):
-    return make_response(jsonify({"status": "failed",
-        'message': 'Not found'}), 404)
+    return make_response(jsonify({
+  "status": "failed",
+  "message": "not found"
+}), 404)
 
 
 @app.errorhandler(500)
@@ -50,12 +54,10 @@ def create_shortlinks():
     if not request.json or 'ios' and 'android' and 'web' not in request.json:
         abort(400)
     data = request.json
-    native = True
     try:
         slug = data['slug']
     except:
         slug = slug_generator()
-        native = False
     Newrecord = {
 
         "slug": slug,
@@ -68,12 +70,45 @@ def create_shortlinks():
     except:
         abort(400)
     del Newrecord['_id']
-    if native:
-        return jsonify('shortlinks', Newrecord)
 
     return jsonify({"status": "successful",
                     "slug": slug,
                     "message": "created successfully"}),201
+
+
+
+
+@app.route('/shortlinks/<link_slug>', methods=['PUT'])
+def update_link(link_slug):
+    out = []
+    for slug in mydb.shortlink.find({"slug": link_slug}):
+        links = {}
+        links['web'] = slug['web']
+        links['ios'] = slug['ios']
+        out.append(links)
+
+    if not request.json:
+        abort(400)
+    if len(out) == 0:
+        return abort(404)
+
+
+    data = request.get_json()
+
+
+
+    if 'ios' in data and 'fallback' in data['ios']:
+        mydb.shortlinks.update({'slug':link_slug}, {'$set':{'ios.fallback':data['ios']['fallback']}})
+
+
+    if 'web' in data:
+        mydb.shortlinks.update({'slug': link_slug}, {'$set': {'web': data['web']}})
+
+
+    return jsonify({
+    "status": "successful",
+    "message": "updated successfully"}),201
+
 
 
 

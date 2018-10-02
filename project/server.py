@@ -2,7 +2,6 @@ from flask import Flask, jsonify, make_response, request, abort
 from pymongo import MongoClient
 from project import config
 import string , random
-import six
 
 app = Flask(__name__)
 
@@ -80,25 +79,27 @@ def create_shortlinks():
 
 @app.route('/shortlinks/<link_slug>', methods=['PUT'])
 def update_link(link_slug):
-    out = []
-    for slug in mydb.shortlink.find({"slug": link_slug}):
-        links = {}
-        links['web'] = slug['web']
-        links['ios'] = slug['ios']
-        out.append(links)
+
+    links = [slug for slug in mydb.shortlink.find({"slug": link_slug})]
 
     if not request.json:
         abort(400)
-    if len(out) == 0:
+    if len(links) == 0:
         return abort(404)
 
 
     data = request.get_json()
 
+    if 'android' in data and 'fallback' in data['android']:
+        mydb.shortlinks.update({'slug':link_slug}, {'$set':{'android.fallback':data['android']['fallback']}})
+    elif'android' in data and 'primay' in data['android']:
+        mydb.shortlinks.update({'slug': link_slug}, {'$set': {'android.primary': data['android']['primary']}})
 
 
     if 'ios' in data and 'fallback' in data['ios']:
         mydb.shortlinks.update({'slug':link_slug}, {'$set':{'ios.fallback':data['ios']['fallback']}})
+    elif 'ios' in data and 'primay' in data['ios']:
+        mydb.shortlinks.update({'slug': link_slug}, {'$set': {'ios.primary': data['ios']['primary']}})
 
 
     if 'web' in data:
@@ -108,6 +109,7 @@ def update_link(link_slug):
     return jsonify({
     "status": "successful",
     "message": "updated successfully"}),201
+
 
 
 
